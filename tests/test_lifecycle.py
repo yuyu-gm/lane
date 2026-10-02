@@ -29,6 +29,7 @@ class V1LaneTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="lane-tests-")
         self.repo = Path(self.temp.name) / "repo"
         self.repo.mkdir()
+        self.repo = self.repo.resolve()
         git(self.repo, "init", "-b", "main")
         git(self.repo, "config", "user.name", "Lane Tests")
         git(self.repo, "config", "user.email", "lane-tests@example.invalid")

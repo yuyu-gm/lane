@@ -21,6 +21,7 @@ class V1CleanupTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.repo = Path(self.temp.name) / "repo"
         self.repo.mkdir()
+        self.repo = self.repo.resolve()
         git(self.repo, "init", "-b", "main")
         git(self.repo, "config", "user.name", "Lane Tests")
         git(self.repo, "config", "user.email", "lane-tests@example.invalid")

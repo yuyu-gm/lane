@@ -18,6 +18,7 @@ class CliTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory(prefix="lane-native-")
         self.repo = Path(self.temp.name) / "repo"
         self.repo.mkdir()
+        self.repo = self.repo.resolve()
         git(self.repo, "init", "-b", "main")
         git(self.repo, "config", "user.name", "Lane Tests")
         git(self.repo, "config", "user.email", "lane-tests@local.invalid")
@@ -338,6 +339,35 @@ class CliTests(unittest.TestCase):
         self.assertFalse(wt.exists())
         self.assertTrue(all(Path(f["destination"]).exists() for f in c["files"]))
         self.call("clean", "worker", "--collection", receipt, "--delete-branch")
+
+    @unittest.skipUnless(os.name == "nt", "Windows short-path aliases")
+    def test_collection_with_new_destination_under_short_path(self):
+        wt = self.artifact_setup()
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.GetShortPathNameW.argtypes = [ctypes.c_wchar_p, ctypes.c_wchar_p, ctypes.c_uint32]
+        kernel.GetShortPathNameW.restype = ctypes.c_uint32
+
+        def short_path(path):
+            buffer = ctypes.create_unicode_buffer(32768)
+            self.assertGreater(kernel.GetShortPathNameW(str(path), buffer, len(buffer)), 0)
+            return Path(buffer.value)
+
+        parent = Path(self.temp.name).resolve()
+        short_parent = short_path(parent)
+        if short_parent == parent:
+            self.skipTest("8.3 aliases are disabled on this volume")
+        inside = short_path(wt) / "archive"
+        self.call("collect", "worker", "--dest", inside, code=12)
+        self.assertFalse(inside.exists())
+        collection = self.call("collect", "worker", "--dest", short_parent / "archive")
+        self.assertEqual(collection["status"], "verified")
+        receipt = collection["receipt"]
+        preview = self.call("clean", "worker", "--dry-run", "--collection", receipt)
+        self.assertEqual(preview["status"], "ready")
+        archived = {f["destination"]: Path(f["destination"]).read_bytes() for f in collection["files"]}
+        self.call("clean", "worker", "--collection", receipt, "--delete-branch")
+        self.assertFalse(wt.exists())
+        self.assertTrue(all(Path(path).read_bytes() == content for path, content in archived.items()))
 
     def test_collection_source_or_destination_changes_block_deletion(self):
         wt = self.artifact_setup()

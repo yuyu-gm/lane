@@ -220,8 +220,15 @@ impl Store {
         let _lock = self.lock()?;
         let inv = self.inventory(id, roots)?;
         let wt = PathBuf::from(s(&inv, "cwd"));
-        let dest = absolute(dest)?;
+        let mut dest = absolute(dest)?;
         no_links(&dest)?;
+        if !dest.exists() {
+            let parent = dest
+                .ancestors()
+                .find(|path| path.exists())
+                .ok_or_else(|| Error::lane("collection destination has no existing parent"))?;
+            dest = absolute(parent)?.join(dest.strip_prefix(parent).unwrap());
+        }
         if dest.starts_with(&wt) || dest.starts_with(self.dir("worktrees")) {
             return Err(Error::lane(
                 "collection destination must be outside managed worktrees",
@@ -231,6 +238,8 @@ impl Store {
         let folder = dest.join(format!("{id}-{collection_id}"));
         fs::create_dir_all(&dest)?;
         fs::create_dir(&folder)?;
+        let folder = absolute(&folder)?;
+        no_links(&folder)?;
         let receipt_path = self
             .dir("collections")
             .join(format!("{collection_id}-{id}.json"));
