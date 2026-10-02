@@ -1,0 +1,14 @@
+/target/
+/dist/
+__pycache__/
+*.pyc
+.serena/
+.agent-tools/
+.venv/
+.codex/
+.vscode/
+.idea/
+.env
+.env.*
+!.env.example
+/AGENTS.md
